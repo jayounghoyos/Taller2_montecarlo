@@ -1,0 +1,619 @@
+% =============================================================================
+% Taller 2 - Simulación Montecarlo de un sistema de inventarios
+% Contenido del informe. Todas las cifras provienen de General/Resultados.tex,
+% generado por tools/exportar_resultados.py (no se digitan a mano).
+% =============================================================================
+
+% Histograma de 10 clases a partir de coordenadas (límite inferior, frecuencia)
+\newcommand{\histograma}[3]{%
+\begin{tikzpicture}
+\begin{axis}[
+  ybar interval, width=0.95\linewidth, height=5.6cm, ymin=0,
+  title={\small #2},
+  xlabel={\footnotesize Ganancia anual (millones de COP)},
+  ylabel={\footnotesize Frecuencia (réplicas)},
+  x tick label style={font=\scriptsize, rotate=40, anchor=north east,
+    /pgf/number format/.cd, fixed, precision=1, use comma, 1000 sep={}},
+  y tick label style={font=\scriptsize},
+  xtick=data, grid=major, grid style={gray!25}]
+\edef\histtmp{\noexpand\addplot[fill=#3, draw=black] coordinates {#1};}\histtmp
+\end{axis}
+\end{tikzpicture}}
+
+\section{Introducción}
+
+Este documento presenta el análisis del Taller~2. Se simula un año completo (los 313 días
+hábiles de 2026, de lunes a sábado) de un sistema de inventarios con política $(s,Q)$: al cierre
+de cada día, si el inventario final es estrictamente menor que $s$, se piden $Q$ unidades, que
+llegan al inicio del siguiente día hábil. La demanda diaria es discreta entre 3 y 7 unidades y
+se estudian dos casos: uniforme discreta y empírica \cite{eafit2026}. Cada experimento usa \nReplicas{} réplicas
+independientes del año.
+
+El modelo se construyó en dos herramientas que respetan exactamente los mismos supuestos y
+ecuaciones del enunciado:
+
+\begin{itemize}
+  \item \textbf{Parte A (Excel):} libro con las hojas \texttt{Parametros}, \texttt{Uniforme},
+  \texttt{Empirica} y \texttt{Politicas}, con nombres definidos, una fila por día hábil y una tabla
+  de datos de 100 réplicas (\texttt{=TABLA(;W2)}).
+  \item \textbf{Parte B (Python):} programa \texttt{.py} organizado en funciones (bloques B1 a B8),
+  con semilla fija \semilla{} y números aleatorios comunes para comparar políticas.
+\end{itemize}
+
+La política recomendada es $\boldsymbol{s=\polS,\ Q=\polQ}$. Las secciones siguientes
+justifican esta elección con los resultados de ambas herramientas.
+
+\subsection{Verificación del modelo}
+
+Con $s=6$, $Q=10$ y demandas fijas de 4, 7 y 5 unidades, el libro de Excel (escribiendo
+temporalmente esas demandas en \texttt{G6:G8}) y la función \texttt{simulate\_year} de Python
+producen exactamente los valores del enunciado (\cref{tab:verificacion}). Además, en ambas hojas
+\texttt{B318} muestra 31/12/2026, \texttt{A318} vale 313 y la suma de la columna \texttt{D} es 12
+(12 cargos de costo fijo); la comprobación automática de la celda \texttt{U10} es
+\comprobacionCalendario.
+
+\begin{table}[H]
+\centering
+\caption{Ejemplo de verificación ($s=6$, $Q=10$). Idéntico en Excel y en Python.}
+\label{tab:verificacion}
+\small
+\begin{tabular}{cl rrrrrr c r}
+\toprule
+Día & Fecha & $R$ & $II$ & $D$ & $V$ & $P$ & $IF$ & Pedido & Utilidad del día \\
+\midrule
+\tablaVerificacionExcel
+\bottomrule
+\end{tabular}
+\end{table}
+
+% =============================================================================
+\section{Parte A: análisis del modelo en Excel}
+% =============================================================================
+
+\subsection{Construcción del libro}
+
+\begin{itemize}
+  \item \texttt{Parametros}: los ocho parámetros en \texttt{B4:B11} con sus nombres definidos
+  (\texttt{PuntoReorden}, \texttt{CantPedido}, \texttt{PrecioVenta}, \texttt{CostoUnitario},
+  \texttt{CostoPedido}, \texttt{CostoAlm}, \texttt{CostoFijo}, \texttt{AnioSim}) y la tabla
+  \texttt{TablaEmpirica} (\texttt{E4:F8}) de la transformada inversa, cuya suma de
+  probabilidades se verifica en \texttt{G9}.
+  \item \texttt{Uniforme} y \texttt{Empirica}: columnas \texttt{A} a \texttt{R} con las fórmulas
+  del enunciado (fila 6 = día 1; fila 7 copiada hasta la 318). La única diferencia es la columna
+  \texttt{G}: \texttt{=ALEATORIO.ENTRE(3;7)} frente a
+  \texttt{=BUSCARV(ALEATORIO();TablaEmpirica;2;VERDADERO)}, que implementa el método de la transformada inversa \cite{ross2013}.
+  \item Resumen de la réplica en \texttt{U6:U8} (más el inventario final del 31/12 en
+  \texttt{U9}), tabla de datos \texttt{W6:AA106} con celda de entrada vacía \texttt{W2},
+  estadísticos en \texttt{AC5:AC8} y histograma de 10 clases de igual ancho en
+  \texttt{AB16:AF26} con su gráfico de columnas (ancho de intervalo 0\,\%).
+  \item \texttt{Politicas}: \nPoliticasXl{} combinaciones $(s,Q)$ por cada caso de demanda,
+  registradas como valores.
+\end{itemize}
+
+\subsection{Pregunta 1: desempeño de la política recomendada}
+
+\Cref{tab:A1} resume las 100 réplicas guardadas en el libro para $s=\polS$, $Q=\polQ$.
+
+\begin{table}[H]
+\centering
+\caption{Estadísticos de la política recomendada en Excel (100 réplicas).}
+\label{tab:A1}
+\begin{tabular}{lrr}
+\toprule
+Estadístico & Demanda uniforme & Demanda empírica \\
+\midrule
+Ganancia promedio ($\bar G$) & \xlUMedia & \xlEMedia \\
+Desviación estándar ($S_G$, \texttt{DESVEST.M}) & \xlUDesv & \xlEDesv \\
+Error estándar de la media ($S_G/\sqrt{100}$) & \xlUEE & \xlEEE \\
+Probabilidad de ventas perdidas ($\hat p_{\text{perdida}}$) & \xlUPp & \xlEPp \\
+Ventas perdidas promedio (unidades/día) & \xlUVp & \xlEVp \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.49\textwidth}
+\histograma{\xlUHist}{Excel, demanda uniforme}{EAFIT-blue!55}
+\end{subfigure}\hfill
+\begin{subfigure}{0.49\textwidth}
+\histograma{\xlEHist}{Excel, demanda empírica}{orange!60}
+\end{subfigure}
+\caption{Histogramas de la ganancia anual en Excel (10 clases de igual ancho entre el mínimo y
+el máximo; las frecuencias suman \xlUFreqTotal{} en ambos casos).}
+\label{fig:histExcel}
+\end{figure}
+
+\textbf{Justificación.} Con $s=\polS$ y $Q=\polQ$ no hubo ningún día con faltantes en ninguna
+de las 200 réplicas (313 días cada una), lo que coincide con el resultado teórico de la
+pregunta~5. La ganancia anual promedio está alrededor de \$103 millones en ambos casos, con una
+desviación estándar cercana a \$3 millones (aproximadamente 3\,\% de la media). El error
+estándar de la media, cercano a \$0,3 millones, indica que la ganancia esperada se estima con
+una precisión de aproximadamente $\pm$\$0,6 millones (intervalo de confianza del 95\,\%).
+
+\subsection{Pregunta 2: media y varianza teóricas de la demanda}
+
+Para una demanda discreta $D$ con valores $d$ y probabilidades $p(d)$:
+$E[D]=\sum_d d\,p(d)$ y $\operatorname{Var}[D]=\sum_d (d-E[D])^2 p(d)$.
+
+\begin{itemize}
+  \item \textbf{Uniforme:} $E[D]=0{,}2\,(3+4+5+6+7)=5$ y
+  $\operatorname{Var}[D]=0{,}2\,(4+1+0+1+4)=2$ (equivale a $(k^2-1)/12$ con $k=5$ valores);
+  desviación estándar $\sqrt2\approx1{,}414$.
+  \item \textbf{Empírica:} $E[D]=3(0{,}20)+4(0{,}05)+5(0{,}40)+6(0{,}25)+7(0{,}10)=5$ y
+  $\operatorname{Var}[D]=4(0{,}20)+1(0{,}05)+0(0{,}40)+1(0{,}25)+4(0{,}10)=1{,}5$;
+  desviación estándar $\approx1{,}225$.
+\end{itemize}
+
+Estos valores también se calculan con fórmulas en \texttt{Parametros!A21:D23}.
+
+\textbf{Parecido.} Ambas distribuciones tienen el mismo soporte (3 a 7) y la misma media, 5
+unidades por día. Por eso, en promedio, se demandan $5\times313=1565$ unidades al año en ambos
+casos y los ingresos esperados son prácticamente iguales.
+
+\textbf{Diferencia.} La empírica tiene 25\,\% menos varianza: concentra el 40\,\% de la
+probabilidad en 5 y asigna solo 0,10 a la demanda máxima de 7, frente a 0,20 en la uniforme.
+
+\textbf{Efecto en ventas perdidas y ganancia.} Con $s\ge7$ no hay faltantes en ninguno de los
+dos casos (pregunta~5), así que la diferencia no se manifiesta en la política recomendada. Con
+$s<7$ sí aparece. Por ejemplo, con $s=6$ solo se pierde venta cuando el día empieza con
+exactamente 6 unidades y llega una demanda de 7; como $P(D=7)$ es el doble en la uniforme, la
+probabilidad de faltante es aproximadamente el doble (hoja \texttt{Politicas}, \cref{tab:A3}).
+En ganancia promedio las diferencias entre casos son pequeñas y del orden del error de
+Montecarlo, porque ambas demandas tienen la misma media. La menor varianza de la empírica se
+nota en las ventas perdidas, no en el ingreso esperado.
+
+\subsection{Pregunta 3: comparación de políticas y criterio de selección}
+
+\begin{table}[H]
+\centering
+\caption{Hoja \texttt{Politicas}: \nPoliticasXl{} políticas por caso de demanda, 100 réplicas cada una
+(resaltada la recomendada).}
+\label{tab:A3}
+\small
+\begin{tabular}{lcc rr cc}
+\toprule
+Demanda & $s$ & $Q$ & Ganancia promedio & Desv. estándar & Prob. pérdida & Perdidas/día \\
+\midrule
+\tablaPoliticasExcel
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Criterio explícito}, aplicado en orden:
+\begin{enumerate}
+  \item \textbf{Nivel de servicio:} cero ventas perdidas con ambas demandas. Una venta perdida
+  significa un cliente insatisfecho; la pregunta~5 demuestra que $s\ge7$ y $Q\ge7$ lo garantizan
+  sin importar la secuencia de demandas.
+  \item \textbf{Ganancia:} entre las políticas con servicio completo, la de mayor ganancia
+  promedio considerando los dos casos de demanda (promedio de ambos).
+  \item \textbf{Riesgo:} si las diferencias de ganancia son menores que el error de Montecarlo,
+  se prefiere la de menor desviación estándar y la que respalde la teoría (pregunta~6).
+\end{enumerate}
+
+\begin{table}[H]
+\centering
+\caption{Políticas con cero ventas perdidas en ambos casos, ordenadas por ganancia promedio conjunta.}
+\label{tab:A3b}
+\small
+\begin{tabular}{cc rrr}
+\toprule
+$s$ & $Q$ & Uniforme & Empírica & Promedio de ambos \\
+\midrule
+\tablaCriterioExcel
+\bottomrule
+\end{tabular}
+\end{table}
+
+\xlServFrase
+
+Las políticas con $s\le6$ nunca garantizan el servicio. Si solo se mirara la ganancia, la mayor
+media de la hoja sería $s=\xlMejorUs$, $Q=\xlMejorUq$ con demanda uniforme (\xlMejorUmedia;
+probabilidad de pérdida \xlMejorUpp) y $s=\xlMejorEs$, $Q=\xlMejorEq$ con la empírica
+(\xlMejorEmedia; probabilidad de pérdida \xlMejorEpp). En Excel cada política usa números
+aleatorios distintos, así que el error estándar de la diferencia de dos medias es aproximadamente
+\xlEEdif, y solo diferencias mayores que \xlEEdifDos{} (dos errores estándar) se distinguen del
+azar.
+
+\textbf{Costo del servicio completo.} Bajar a $s=6$ sí aumenta un poco la ganancia esperada:
+sobra menos inventario al 31/12 (cada unidad sobrante cuesta \$600.000) y una venta perdida solo
+cuesta el margen de \$80.000. Con \repsPrecision{} réplicas y números aleatorios comunes
+(Parte~B), la ganancia adicional de $s=6$, $Q=\polQ$ frente a la recomendada es \servUSeis{}
+$\pm$ \servUSeisIC{} con demanda uniforme y \servESeis{} $\pm$ \servESeisIC{} con la empírica
+(diferencias \servUSeisSig{} y \servESeisSig, del \servUSeisPct\,\% y \servESeisPct\,\% de la
+ganancia), a cambio de días con faltante en una fracción de \servUSeisPp{} y \servESeisPp{}.
+La recomendación $s=\polS$, $Q=\polQ$ paga ese costo pequeño para garantizar servicio completo;
+si la empresa aceptara faltantes ocasionales, $s=6$, $Q=\polQ$ sería la alternativa.
+
+\subsection{Pregunta 4: forma de los histogramas y origen de la variabilidad}
+
+Los histogramas de la \cref{fig:histExcel} son unimodales y aproximadamente simétricos, con
+forma de campana. La ganancia va de \xlUMin{} a \xlUMax{} millones (uniforme) y de \xlEMin{} a
+\xlEMax{} millones (empírica). Es una dispersión moderada: la desviación estándar es de unos
+\$3 millones sobre una media de \$103 millones.
+
+La variabilidad entre réplicas se explica sobre todo por el \textbf{inventario final del
+31/12/2026}. Por el supuesto~10, ese inventario no tiene valor residual: cada unidad sobrante se
+pagó a \$600.000 y nunca se vende. El inventario de cierre depende de en qué punto del ciclo de
+pedidos termina el año. Si el último pedido de $Q=\polQ$ unidades llegó en los últimos días,
+sobran muchas unidades; si llegó semanas antes, sobran pocas. En las 100 réplicas de Excel varió
+entre \xlUInvRango{} (uniforme) y \xlEInvRango{} (empírica) unidades. La relación se midió en la
+hoja (celdas \texttt{AC30:AC33}):
+
+\begin{table}[H]
+\centering
+\caption{Regresión de la ganancia anual sobre el inventario sobrante al 31/12.}
+\label{tab:A4}
+\begin{tabular}{lrr}
+\toprule
+ & Uniforme & Empírica \\
+\midrule
+Inventario final promedio (unidades) & \xlUInvFin & \xlEInvFin \\
+Correlación ganancia--inventario final & \xlUCorr & \xlECorr \\
+Pendiente (\$ por unidad sobrante) & \xlUPend & \xlEPend \\
+Variabilidad explicada ($R^2$) & \xlURR\,\% & \xlERR\,\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La pendiente es del orden del costo unitario de \$600.000: cada unidad que sobra al cierre resta
+aproximadamente su costo de compra. Esta sola variable explica el \xlURR\,\% (uniforme) y el
+\xlERR\,\% (empírica) de la variabilidad de la ganancia en Excel, y el \pyURR\,\% y \pyERR\,\% en
+Python (pendientes de \pyUPend{} y \pyEPend{} por unidad). El resto proviene del volumen total demandado en el año. Su
+desviación estándar es $\sqrt{313\operatorname{Var}[D]}\approx25$ unidades (uniforme) y 22
+(empírica), y cada unidad vendida deja un margen aproximado de \$80.000 menos el costo de
+pedido prorrateado, es decir, cerca de \$2 millones de desviación. La combinación de ambos
+efectos ($\sqrt{2^2+2{,}6^2}\approx3{,}3$ millones, tomando el inventario de cierre como
+aproximadamente uniforme dentro de un ciclo de $Q$ unidades) reproduce el orden de magnitud de
+la desviación estándar observada.
+
+\subsection{Pregunta 5: \texorpdfstring{$s\ge7$ y $Q\ge7$}{s>=7 y Q>=7} implican cero ventas perdidas}
+
+\textbf{Proposición.} Si $s\ge7$ y $Q\ge7$, entonces $P_t=0$ para todo $t=1,\dots,313$ y toda
+secuencia de demandas $D_t\in\{3,\dots,7\}$.
+
+\textbf{Demostración.} Basta probar que $II_t\ge7$ para todo $t$. Como $D_t\le7$, eso da
+$V_t=\min(II_t,D_t)=D_t$ y por tanto $P_t=D_t-V_t=0$.
+\begin{itemize}
+  \item \emph{Día 1:} por la ecuación (2), $II_1=R_1=Q\ge7$.
+  \item \emph{Día $t\ge2$:} hay dos casos según la revisión del día anterior (ecuación 4).
+  \begin{itemize}
+    \item Si $IF_{t-1}\ge s$, no se pidió ($O_{t-1}=0$) y $II_t=IF_{t-1}\ge s\ge7$.
+    \item Si $IF_{t-1}<s$, se pidió ($O_{t-1}=1$), el pedido llega al inicio del día $t$
+    (tiempo de entrega cero) y $II_t=IF_{t-1}+Q\ge0+Q\ge7$, porque $IF_{t-1}\ge0$.
+  \end{itemize}
+\end{itemize}
+En ambos casos $II_t\ge7\ge D_t$. \hfill$\blacksquare$
+
+Las dos condiciones son necesarias. Con $s\le6$ el día puede empezar con 6 unidades sin pedido
+pendiente, y una demanda de 7 genera faltante. Con $Q\le6$ un día que empieza con inventario
+final 0 más el pedido tiene solo $Q<7$ unidades.
+
+\textbf{Confirmación con los resultados.} En la hoja \texttt{Politicas} todas las políticas con
+$s\ge7$ tienen probabilidad de ventas perdidas exactamente 0,0000, y todas las de $s\le6$ tienen
+faltantes (\cref{tab:A3}). En Python, las \pyUNCubiertas{} políticas de la rejilla con $s\ge7$ y
+$Q\ge7$ tienen cero ventas perdidas con ambas demandas, mientras que las de
+$s\le6$ siempre presentan faltantes.
+
+\subsection{Pregunta 6: efecto de aumentar \texorpdfstring{$Q$}{Q} con \texorpdfstring{$s$}{s} fijo}
+
+\begin{table}[H]
+\centering
+\caption{Excel, $s=\polS$ fijo: ganancia promedio y desviación estándar según $Q$.}
+\label{tab:A6}
+\begin{tabular}{c rr rr}
+\toprule
+ & \multicolumn{2}{c}{Ganancia promedio} & \multicolumn{2}{c}{Desviación estándar} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+$Q$ & Uniforme & Empírica & Uniforme & Empírica \\
+\midrule
+\tablaQExcel
+\bottomrule
+\end{tabular}
+\end{table}
+
+Con $s$ fijo, la ganancia promedio \textbf{primero aumenta y luego disminuye} al crecer $Q$, con
+un máximo plano alrededor de $Q\approx13$--17. La desviación estándar crece de forma sostenida.
+En Excel la caída para lotes grandes es clara: con $Q=30$ la ganancia es \xlQtreintaU{}
+(uniforme) y \xlQtreintaE{} (empírica) menor que con $Q=\polQ$, y la desviación estándar es
+\xlQtreintaStdU{} veces mayor. Entre $Q=10$, 15 y 20 las diferencias son del orden del error de
+Montecarlo, porque cada política usa números aleatorios distintos. La forma completa de la curva se ve en la rejilla de
+Python con $s=7$ y $Q$ de 8 a 30 (\cref{tab:matU,tab:matE}) y en la corrida de \repsPrecision{}
+réplicas (\cref{tab:B3}). Con $s\ge7$ no hay ventas perdidas, así que los ingresos y los costos
+fijos no dependen de $Q$; la tendencia la explican tres costos:
+
+\begin{itemize}
+  \item \textbf{Costo por pedido} (pesa más con $Q$ pequeño): se hacen cerca de $1565/Q$ pedidos
+  al año, con un costo de $40.000\times1565/Q$. Ese costo baja de \$6,3 millones con $Q=10$ a
+  \$4,2 millones con $Q=15$ y \$3,1 millones con $Q=20$.
+  \item \textbf{Inventario sobrante al 31/12} (pesa más con $Q$ grande): en promedio sobran unas
+  $Q/2$ unidades adicionales a \$600.000 cada una, es decir, unos \$300.000 por cada unidad
+  adicional de $Q$. También aumenta el riesgo, porque el sobrante puede llegar a $s-1+Q$ unidades.
+  \item \textbf{Almacenamiento:} \$80 por unidad-día equivale a unos \$25.000 por unidad de
+  inventario promedio al año. Es casi despreciable frente a los dos anteriores.
+\end{itemize}
+
+Minimizar $C(Q)=40.000\cdot\frac{1565}{Q}+(600.000+25.040)\cdot\frac{Q}{2}$ da
+$Q^\ast=\sqrt{2\cdot40.000\cdot1565/625.040}\approx14{,}2$ unidades. Este razonamiento, análogo
+al lote económico \cite{winston2004}, coincide con el máximo observado en la simulación y respalda $Q=\polQ$.
+
+% =============================================================================
+\section{Parte B: análisis del modelo en Python}
+% =============================================================================
+
+El programa reproduce la Parte~A con bucles explícitos: cada línea de \texttt{simulate\_year}
+corresponde a una columna de la hoja. Se verifica automáticamente con el ejemplo del enunciado
+(\cref{tab:verificacion}) y con el calendario de 313 días. Ejecutar el programa completo (casi
+34.000 años simulados) tomó \tiempoPython{} segundos.
+
+\subsection{Pregunta 1: estadísticos, histogramas y comparación con Excel}
+
+\begin{table}[H]
+\centering
+\caption{Política $s=\polS$, $Q=\polQ$: Python (semilla \semilla) frente a Excel, 100 réplicas cada uno.}
+\label{tab:B1}
+\small
+\begin{tabular}{l rr rr}
+\toprule
+ & \multicolumn{2}{c}{Demanda uniforme} & \multicolumn{2}{c}{Demanda empírica} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Estadístico & Python & Excel & Python & Excel \\
+\midrule
+Ganancia promedio & \pyUMedia & \xlUMedia & \pyEMedia & \xlEMedia \\
+Desviación estándar & \pyUDesv & \xlUDesv & \pyEDesv & \xlEDesv \\
+Error estándar de la media & \pyUEE & \xlUEE & \pyEEE & \xlEEE \\
+Prob. de ventas perdidas & \pyUPp & \xlUPp & \pyEPp & \xlEPp \\
+Ventas perdidas por día & \pyUVp & \xlUVp & \pyEVp & \xlEVp \\
+\midrule
+Diferencia Excel $-$ Python & \multicolumn{2}{c}{\difU{} ($z=$\,\difUZ)} & \multicolumn{2}{c}{\difE{} ($z=$\,\difEZ)} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.49\textwidth}
+\histograma{\pyUHist}{Python, demanda uniforme}{EAFIT-blue!55}
+\end{subfigure}\hfill
+\begin{subfigure}{0.49\textwidth}
+\histograma{\pyEHist}{Python, demanda empírica}{orange!60}
+\end{subfigure}
+\caption{Histogramas de la ganancia anual en Python (\texttt{bins=10}, mismas clases de igual
+ancho que en Excel). El programa los guarda como \texttt{hist\_uniforme.png} y
+\texttt{hist\_empirica.png}.}
+\label{fig:histPython}
+\end{figure}
+
+\textbf{¿Son iguales? ¿Deberían serlo?} No son iguales y \textbf{no deberían serlo}. La lógica
+del modelo es idéntica: con las mismas demandas ambas herramientas dan exactamente las mismas
+utilidades, como muestra el ejemplo de verificación. Pero cada herramienta genera números
+aleatorios distintos (\texttt{ALEATORIO()} en la hoja de cálculo y el generador PCG64 de NumPy
+con semilla \semilla{} en Python). Por eso cada una obtiene una muestra diferente de 100 años.
+
+Lo que sí debe ocurrir es que las diferencias sean explicables por el azar. Para dos muestras
+independientes, $z=(\bar G_{\text{Excel}}-\bar G_{\text{Python}})/\sqrt{EE_1^2+EE_2^2}$ vale
+\difUZ{} y \difEZ, \difZFrase; las medias difieren menos del 1\,\%. Las desviaciones estándar son del mismo orden (unos \$3
+millones), las dos herramientas dan cero ventas perdidas y los histogramas tienen la misma forma.
+
+\subsection{Pregunta 2: sensibilidad a la semilla}
+
+\begin{table}[H]
+\centering
+\caption{Ganancia promedio de 100 réplicas con cinco semillas distintas ($s=\polS$, $Q=\polQ$).}
+\label{tab:B2}
+\begin{tabular}{r rr}
+\toprule
+Semilla & Uniforme & Empírica \\
+\midrule
+\tablaSemillas
+\midrule
+Rango (máx. $-$ mín.) & \semURango{} (\semURangoPct\,\%) & \semERango{} (\semERangoPct\,\%) \\
+Desv. estándar entre semillas & \semUDesv & \semEDesv \\
+Error estándar teórico ($S_G/\sqrt{100}$) & \pyUEE & \pyEEE \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+La ganancia promedio cambia entre \semURango{} (uniforme) y \semERango{} (empírica) de una
+semilla a otra, como máximo el \semMaxPct\,\% de la media. La desviación estándar entre las cinco medias es
+del mismo orden que el error estándar teórico $S_G/\sqrt{n}\approx$ \$0,3 millones, como predice
+la teoría: la media de 100 réplicas es una variable aleatoria con esa dispersión.
+
+\textbf{Implicación sobre la precisión.} Con 100 réplicas, la ganancia esperada se conoce con un
+intervalo de confianza del 95\,\% de unos $\pm$\$0,6 millones (por ejemplo, \pyUIC{} para la
+uniforme). Es suficiente para afirmar que la ganancia anual es de unos \$103 millones, pero
+\textbf{no} para distinguir políticas cuyas medias difieren en \$0,1--0,5 millones, como las
+mejores de la rejilla. El error disminuye como $1/\sqrt n$ \cite{law2015}: para reducirlo a la mitad hacen falta
+4 veces más réplicas. Por eso la Parte~B usa además números aleatorios comunes y una corrida de
+\repsPrecision{} réplicas (intervalos de $\pm$\precIC{}).
+
+\subsection{Pregunta 3: rejilla amplia de políticas}
+
+Se evaluaron \nPoliticasPy{} políticas ($s\in\{4,\dots,9\}$ y $Q\in\{8,10,12,\dots,18,20,25,30\}$)
+con números aleatorios comunes, 100 réplicas y semilla \semilla. Es una rejilla ocho veces más
+amplia que la de Excel (\nPoliticasXl{} políticas). Las \cref{tab:matU,tab:matE} muestran la ganancia promedio en millones de
+pesos (negrita: máximo sin restricción; sombreado: política recomendada). La \cref{tab:matPp}
+muestra la probabilidad de ventas perdidas.
+
+\begin{table}[H]
+\centering
+\caption{Python, demanda uniforme: ganancia promedio (millones de COP) por $(s,Q)$.}
+\label{tab:matU}
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{c|*{12}{r}}
+\toprule
+$s\backslash Q$ & \matUCabeza \\
+\midrule
+\matUMedia
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Python, demanda empírica: ganancia promedio (millones de COP) por $(s,Q)$.}
+\label{tab:matE}
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{c|*{12}{r}}
+\toprule
+$s\backslash Q$ & \matECabeza \\
+\midrule
+\matEMedia
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Python: probabilidad de ventas perdidas por $(s,Q)$ (uniforme arriba, empírica abajo).}
+\label{tab:matPp}
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{c|*{12}{r}}
+\toprule
+$s\backslash Q$ & \matUCabeza \\
+\midrule
+\matUPp
+\midrule
+\matEPp
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{¿Coincide con Excel?} Por ganancia pura, la mejor política de la rejilla es $s=\pyUMejorS$,
+$Q=\pyUMejorQ$ con demanda uniforme (\pyUMejorMedia) y $s=\pyEMejorS$, $Q=\pyEMejorQ$ con la
+empírica (\pyEMejorMedia). Las dos tienen $s\le6$ y pierden ventas (probabilidad \pyUMejorPp{} y
+\pyEMejorPp{}), así que no cumplen el criterio de servicio. Su ventaja sobre la política
+recomendada, medida con diferencias pareadas, es \pyUDifPar{} $\pm$ \pyUDifParIC{}
+(\pyUDifParSig) y \pyEDifPar{} $\pm$ \pyEDifParIC{} (\pyEDifParSig; IC del 95\,\%). Es el mismo
+efecto que mide la corrida de \repsPrecision{} réplicas de la Parte~A (pregunta~3): un $s$ menor
+gana algo más porque deja menos inventario sin valor al 31/12, pero pierde ventas.
+
+Con el mismo criterio de la Parte~A (cero ventas perdidas y máxima ganancia promedio conjunta),
+la rejilla de 100 réplicas elige $s=\pyServS$, $Q=\pyServQ$. Esta política difiere de la
+recomendada solo en $Q$, y por una cantidad que no es significativa (\pyUDifServ{} $\pm$
+\pyUDifServIC{} y \pyEDifServ{} $\pm$ \pyEDifServIC). Para resolver el empate se repitieron las
+políticas con $s=7$ y $Q=11,\dots,19$ con \repsPrecision{} réplicas y números aleatorios comunes
+(\cref{tab:B3}).
+
+\begin{table}[H]
+\centering
+\caption{$s=7$ con \repsPrecision{} réplicas: ganancia promedio y diferencia pareada frente a
+$Q=\polQ$ (IC del 95\,\%).}
+\label{tab:B3}
+\scriptsize
+\begin{tabular}{c rr rr}
+\toprule
+ & \multicolumn{2}{c}{Demanda uniforme} & \multicolumn{2}{c}{Demanda empírica} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+$Q$ & Media & Dif. vs.\ $Q=\polQ$ & Media & Dif. vs.\ $Q=\polQ$ \\
+\midrule
+\tablaPrecision
+\bottomrule
+\end{tabular}
+\end{table}
+
+Con mayor precisión se confirma una meseta: \precMejoresFrase. Las medias bajan hacia los
+extremos, y la caída ya es significativa en \precPeores. Esto coincide con el análisis de costos de la
+pregunta~6 de la Parte~A ($Q^\ast\approx14$). Por lo tanto, entre las políticas con servicio completo,
+\textbf{la mejor coincide con la elegida en Excel}: $s=\polS$, $Q=\polQ$. Es el menor $s$ que garantiza servicio completo
+y un $Q$ en el centro de la meseta óptima. Las diferencias de orden en la rejilla de 100
+réplicas (la recomendada queda en el puesto \pyURango{} con demanda uniforme y \pyERango{} con
+la empírica) se deben al ruido de Montecarlo y no a diferencias reales.
+
+\subsection{Pregunta 4: ¿por qué la misma semilla para todas las políticas?}
+
+\texttt{compare\_policies} crea el generador con la misma semilla para cada política
+(\emph{números aleatorios comunes} \cite{law2015,ross2013}). Así, todas las políticas enfrentan exactamente las mismas
+100 secuencias de 313 demandas, y la diferencia de ganancia entre dos políticas se debe solo a la
+política, no a que una tuvo por suerte un año de demanda más alta. Estadísticamente,
+\[
+\operatorname{Var}(\bar G_A-\bar G_B)=\operatorname{Var}(\bar G_A)+\operatorname{Var}(\bar G_B)-2\operatorname{Cov}(\bar G_A,\bar G_B),
+\]
+y con números comunes la covarianza es positiva (años de alta demanda favorecen a ambas
+políticas), lo que reduce la varianza de la diferencia.
+
+\textbf{¿Qué pasaría sin ellos?} Las diferencias mezclarían el efecto de la política con el
+ruido del muestreo, y el ranking podría invertirse por azar. Por ejemplo, al comparar la mejor
+política sin restricción con la recomendada usando corrientes aleatorias independientes, el
+intervalo de la diferencia fue $\pm$\pyUDifIndIC{} (uniforme) y $\pm$\pyEDifIndIC{}
+(empírica), frente a $\pm$\pyUDifParIC{} y $\pm$\pyEDifParIC{} con números comunes. La
+diferencia estimada también cambió (\pyUDifInd{} y \pyEDifInd{}, frente a \pyUDifPar{} y
+\pyEDifPar{}). Con 72 políticas evaluadas de forma independiente, la que parezca mejor sería, en
+buena medida, la que tuvo más suerte. Los números comunes no eliminan el error de Montecarlo,
+pero hacen la comparación justa y más precisa con el mismo número de réplicas.
+
+\subsection{Pregunta 5: Excel frente a Python}
+
+\begin{table}[H]
+\centering
+\caption{Comparación de las dos herramientas para este modelo.}
+\label{tab:B5}
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.6cm}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X}
+\toprule
+Criterio & Excel & Python \\
+\midrule
+Tiempo de cómputo &
+La tabla de datos recalcula el libro completo (2 hojas de 313 filas y 18 columnas) una vez por
+réplica: 100 recálculos por cada F9. El libro se vuelve lento, por eso se usa el modo
+``automático excepto en las tablas de datos''. &
+El programa completo (unos 34.000 años simulados: estadísticos, 5 semillas, 72 políticas
+$\times$ 2 demandas y la corrida de \repsPrecision{} réplicas) tarda \tiempoPython{} s. \\
+\addlinespace
+Cambiar réplicas o políticas &
+Más réplicas exige ampliar la tabla de datos y los rangos de las fórmulas. Cada política exige
+cambiar $s$ y $Q$ a mano, recalcular y copiar valores (\nPoliticasXl{} políticas = \nPoliticasXl{} ciclos manuales). &
+Se cambia \texttt{N\_REPLICATIONS} o la lista \texttt{POLICIES} en una línea. Pasar de \nPoliticasXl{} a \nPoliticasPy{}
+políticas no requiere trabajo adicional. \\
+\addlinespace
+Trazabilidad &
+Excelente para ver un año: cada día y cada costo están en una celda visible y auditable. Pero las
+réplicas de la tabla de datos no se pueden reproducir: \texttt{ALEATORIO()} no tiene semilla y
+cambia con cada F9. &
+Cada resultado se puede reproducir exactamente gracias a la semilla. El flujo
+(calendario $\to$ demanda $\to$ simulación $\to$ estadísticos) es explícito y puede imprimir el
+registro diario (\texttt{keep\_log=True}). \\
+\addlinespace
+Riesgo de errores &
+Referencias mal copiadas, rangos que no cubren las 313 filas, celda de entrada de la tabla de datos
+mal elegida, valores pegados que quedan desactualizados. &
+Errores de lógica (índices, orden de eventos). Se mitigan con funciones pequeñas, la prueba
+obligatoria automática (\texttt{check\_statement\_example}) y la verificación del calendario. \\
+\addlinespace
+Comparación de políticas &
+Sin números aleatorios comunes: cada política usa números distintos, lo que añade ruido. &
+Números aleatorios comunes, intervalos pareados y miles de réplicas sin esfuerzo adicional. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+En síntesis, Excel es ideal para construir, explicar y auditar la lógica de un año. Python es
+superior para la experimentación: muchas réplicas y políticas, resultados reproducibles y
+comparaciones estadísticamente rigurosas. Validar un modelo contra el otro, con el ejemplo de
+verificación y con estadísticos comparables, aumenta la confianza en ambos.
+
+\section{Conclusiones}
+
+\begin{enumerate}
+  \item Los dos modelos implementan las mismas ecuaciones y reproducen exactamente el ejemplo de
+  verificación del enunciado.
+  \item Se recomienda la política $\boldsymbol{s=\polS,\ Q=\polQ}$. Garantiza cero ventas
+  perdidas con cualquier secuencia de demandas (demostrado en la pregunta~5 y confirmado en las
+  simulaciones), y entre las políticas con servicio completo su ganancia, de unos \$103 millones
+  al año, es estadísticamente equivalente a la mejor de una rejilla de \nPoliticasPy{} políticas.
+  Las políticas con $s=6$ ganan cerca de \servGananciaMax{} más al año (alrededor del 0,4\,\%) a
+  costa de perder ventas.
+  \item La variabilidad de la ganancia anual (desviación estándar de unos \$3 millones) se debe
+  sobre todo al inventario sin valor residual que queda al 31 de diciembre, y en segundo lugar al
+  volumen total de demanda del año.
+  \item Las dos distribuciones de demanda tienen la misma media (5) y producen ganancias
+  promedio similares. La empírica, con menor varianza (1,5 frente a 2), genera menos ventas
+  perdidas cuando $s<7$.
+  \item Con 100 réplicas la ganancia esperada se estima con un margen de unos $\pm$\$0,6
+  millones (95\,\%). Para comparar políticas cercanas se necesitan números aleatorios comunes y
+  más réplicas.
+\end{enumerate}
+

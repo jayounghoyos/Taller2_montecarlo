@@ -15,3 +15,7 @@ Thumbs.db
 # Office / LibreOffice lock files
 ~$*
 .~lock.*#
+
+# Intermediate build files (tools/generar_entrega.sh)
+build/
+hist_*.png

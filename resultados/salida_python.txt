@@ -1,0 +1,129 @@
+Días hábiles de 2026: 313 (01/01/2026 a 31/12/2026)
+Política s = 7, Q = 15 · 100 réplicas · semilla 1000337497
+
+--- Ejemplo del enunciado: s=6, Q=10, demandas 4, 7, 5 ---
+Día 1 01/01/2026  R=10 II=10 D=4 V=4 P=0 IF= 6 Pedido=0 Utilidad=   -4,320,640
+Día 2 02/01/2026  R= 0 II= 6 D=7 V=6 P=1 IF= 0 Pedido=1 Utilidad=    4,079,760
+Día 3 03/01/2026  R=10 II=10 D=5 V=5 P=0 IF= 5 Pedido=1 Utilidad=   -2,640,600
+Las tres utilidades coinciden con el enunciado.
+
+--- Demanda Uniforme | s=7, Q=15, 100 réplicas ---
+Ganancia anual promedio            103,449,494 COP
+Desviación estándar muestral         3,251,964 COP
+Error estándar de la media             325,196 COP
+IC 95 % de la media            [102,804,240 ; 104,094,749]
+P(día con ventas perdidas)     0.0000
+Ventas perdidas por día        0.0000 unidades
+Inventario al 31/12            promedio 8.54, de 0 a 18 unidades
+Ganancia vs. inventario 31/12  r = -0.715, R^2 = 0.511, -493,530 COP por unidad sobrante
+
+Histograma guardado en hist_uniforme.png
+
+--- Demanda Empírica | s=7, Q=15, 100 réplicas ---
+Ganancia anual promedio            102,842,986 COP
+Desviación estándar muestral         3,714,339 COP
+Error estándar de la media             371,434 COP
+IC 95 % de la media            [102,105,987 ; 103,579,985]
+P(día con ventas perdidas)     0.0000
+Ventas perdidas por día        0.0000 unidades
+Inventario al 31/12            promedio 9.62, de 1 a 18 unidades
+Ganancia vs. inventario 31/12  r = -0.861, R^2 = 0.741, -650,962 COP por unidad sobrante
+
+Histograma guardado en hist_empirica.png
+
+--- Cinco semillas, demanda Uniforme ---
+Semilla 1000337497: ganancia media 103,449,494 COP
+Semilla       2026: ganancia media 103,322,879 COP
+Semilla         42: ganancia media 103,332,046 COP
+Semilla        777: ganancia media 103,206,162 COP
+Semilla      31415: ganancia media 103,582,958 COP
+Rango 376,796 COP · desv. est. entre semillas 142,999 COP
+
+--- Cinco semillas, demanda Empírica ---
+Semilla 1000337497: ganancia media 102,842,986 COP
+Semilla       2026: ganancia media 102,829,427 COP
+Semilla         42: ganancia media 103,092,180 COP
+Semilla        777: ganancia media 103,835,812 COP
+Semilla      31415: ganancia media 102,742,836 COP
+Rango 1,092,976 COP · desv. est. entre semillas 448,162 COP
+
+--- 72 políticas, demanda Uniforme (números aleatorios comunes) ---
+  s    Q   Ganancia media    Desv. est.  P(pérdida)  Perd./día
+  5   25      103,454,082     4,692,097      0.0230     0.0307
+  7   15      103,449,494     3,251,964      0.0000     0.0000
+  5   16      103,429,311     3,394,712      0.0387     0.0514
+  6   16      103,396,782     3,741,513      0.0125     0.0125
+  7   13      103,379,122     3,143,636      0.0000     0.0000
+  6   12      103,369,532     2,886,158      0.0163     0.0163
+  7   17      103,333,170     4,191,596      0.0000     0.0000
+  7   16      103,325,810     3,667,230      0.0000     0.0000
+  6   15      103,270,737     3,536,314      0.0141     0.0141
+  6   13      103,227,800     3,248,121      0.0156     0.0156
+  6   17      103,203,640     3,618,908      0.0113     0.0113
+  6   14      103,182,405     3,127,278      0.0137     0.0137
+  7   20      103,170,386     4,444,648      0.0000     0.0000
+  7   12      103,127,330     3,466,713      0.0000     0.0000
+  7   14      103,114,433     3,764,210      0.0000     0.0000
+
+Mayor ganancia sin restricción (Uniforme): s=5, Q=25, 103,454,082 COP
+
+--- 72 políticas, demanda Empírica (números aleatorios comunes) ---
+  s    Q   Ganancia media    Desv. est.  P(pérdida)  Perd./día
+  6   13      104,037,003     2,951,968      0.0073     0.0073
+  5   16      103,862,898     3,339,213      0.0283     0.0353
+  6   12      103,828,725     2,925,960      0.0088     0.0088
+  6   15      103,726,268     3,546,858      0.0066     0.0066
+  6   16      103,479,063     3,190,536      0.0062     0.0062
+  5   18      103,471,499     3,587,887      0.0237     0.0288
+  5   14      103,468,006     2,917,894      0.0313     0.0388
+  5   20      103,446,548     4,040,943      0.0216     0.0268
+  6   18      103,438,648     3,943,775      0.0065     0.0065
+  5   12      103,325,392     2,835,941      0.0343     0.0416
+  6   17      103,320,722     3,431,698      0.0058     0.0058
+  5   13      103,247,288     3,034,361      0.0337     0.0413
+  6   14      103,219,438     3,273,169      0.0070     0.0070
+  7   14      103,164,648     2,772,717      0.0000     0.0000
+  5   15      103,096,037     3,178,198      0.0295     0.0368
+
+Mayor ganancia sin restricción (Empírica): s=6, Q=13, 104,037,003 COP
+
+Mejor con cero ventas perdidas en ambos casos: s=7, Q=13 (103,180,625 COP en promedio)
+s>=7 y Q>=7, demanda Uniforme: 36 políticas, todas sin ventas perdidas = True
+s>=7 y Q>=7, demanda Empírica: 36 políticas, todas sin ventas perdidas = True
+
+Demanda Uniforme, mejor sin restricción: (s=5, Q=25) - (s=7, Q=15) =      4,587 ± 1,023,294 COP (IC 95 % pareado)
+Demanda Uniforme, mejor con cero pérdidas: (s=7, Q=13) - (s=7, Q=15) =    -70,372 ± 603,284 COP (IC 95 % pareado)
+Demanda Empírica, mejor sin restricción: (s=6, Q=13) - (s=7, Q=15) =  1,194,017 ± 734,001 COP (IC 95 % pareado)
+Demanda Empírica, mejor con cero pérdidas: (s=7, Q=13) - (s=7, Q=15) =    139,142 ± 673,635 COP (IC 95 % pareado)
+
+--- s=7 con 1000 réplicas por política, demanda Uniforme ---
+Q=11: media    102,926,194 COP | frente a Q=15:   -345,380 ±  202,536 COP
+Q=12: media    103,104,975 COP | frente a Q=15:   -166,599 ±  199,233 COP
+Q=13: media    103,263,648 COP | frente a Q=15:     -7,925 ±  191,730 COP
+Q=14: media    103,409,558 COP | frente a Q=15:    137,984 ±  265,725 COP
+Q=15: media    103,271,573 COP | frente a Q=15:          0 ±        0 COP
+Q=16: media    103,375,177 COP | frente a Q=15:    103,604 ±  285,331 COP
+Q=17: media    103,078,979 COP | frente a Q=15:   -192,594 ±  256,006 COP
+Q=18: media    103,046,891 COP | frente a Q=15:   -224,682 ±  265,501 COP
+Q=19: media    102,933,175 COP | frente a Q=15:   -338,398 ±  258,621 COP
+
+--- s=7 con 1000 réplicas por política, demanda Empírica ---
+Q=11: media    103,142,073 COP | frente a Q=15:   -192,113 ±  203,163 COP
+Q=12: media    103,361,303 COP | frente a Q=15:     27,116 ±  201,304 COP
+Q=13: media    103,361,276 COP | frente a Q=15:     27,090 ±  184,208 COP
+Q=14: media    103,490,922 COP | frente a Q=15:    156,735 ±  268,999 COP
+Q=15: media    103,334,186 COP | frente a Q=15:          0 ±        0 COP
+Q=16: media    103,397,419 COP | frente a Q=15:     63,233 ±  287,115 COP
+Q=17: media    103,250,927 COP | frente a Q=15:    -83,260 ±  258,894 COP
+Q=18: media    103,114,934 COP | frente a Q=15:   -219,252 ±  276,858 COP
+Q=19: media    102,977,296 COP | frente a Q=15:   -356,890 ±  257,211 COP
+
+--- Costo del servicio completo, 1000 réplicas, demanda Uniforme ---
+(s=6, Q=15) - (s=7, Q=15) =    401,231 ± 267,232 COP | P(pérdida) = 0.0135
+(s=5, Q=15) - (s=7, Q=15) =   -139,987 ± 232,026 COP | P(pérdida) = 0.0407
+
+--- Costo del servicio completo, 1000 réplicas, demanda Empírica ---
+(s=6, Q=15) - (s=7, Q=15) =    421,108 ± 219,755 COP | P(pérdida) = 0.0066
+(s=5, Q=15) - (s=7, Q=15) =    315,747 ± 220,878 COP | P(pérdida) = 0.0304
+
+Tiempo total de cómputo: 11.0 s
