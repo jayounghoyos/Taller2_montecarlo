@@ -34,6 +34,7 @@ from openpyxl.chart.trendline import Trendline, TrendlineLabel
 from openpyxl.drawing.line import LineProperties
 from openpyxl.drawing.text import (CharacterProperties, Paragraph, ParagraphProperties,
                                    RegularTextRun)
+from openpyxl.formatting.rule import FormulaRule
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.workbook.defined_name import DefinedName
 from openpyxl.workbook.properties import CalcProperties
@@ -460,63 +461,129 @@ def build_simulation(wb, title, demand_formula, label, replications):
 
 # --- Sheet: Politicas --------------------------------------------------------------
 def build_politicas(wb, policies, recommended):
+    """Step A9 sheet.
+
+    Only the four statistics recorded for each policy are stored as values (the
+    statement asks for "como valores"). Every derived figure, the selection
+    criterion and the chart data are formulas over those values and Parametros.
+    """
     ws = wb.create_sheet("Politicas")
     title_block(ws, "Comparación de políticas (s, Q)",
-                "100 réplicas por combinación y caso de demanda (Paso A9): se cambian s y Q "
-                "en Parametros, se recalcula y se guardan los estadísticos como valores.")
-    heads = [("Demanda", 12), ("s", 6), ("Q", 6), ("Ganancia promedio", 16),
-             ("Desv. estándar", 15), ("Prob. ventas perdidas", 12),
-             ("Ventas perdidas por día", 12), ("Observación", 36)]
-    for col, (text, width) in enumerate(heads, start=1):
-        header(ws, 4, col, text, width, right=1 < col < 8)
+                "Paso A9: se cambian s y Q en Parametros, se recalculan las 100 réplicas y los "
+                "cuatro estadísticos se guardan como valores (columnas D:G). Lo demás son "
+                "fórmulas.")
+    heads = [("Demanda", 11, False), ("s", 5, True), ("Q", 5, True),
+             ("Ganancia promedio", 15, True), ("Desv. estándar", 14, True),
+             ("Prob. ventas perdidas", 11, True), ("Ventas perdidas por día", 11, True),
+             ("Error estándar de la media", 13, True), ("Servicio completo", 10, False),
+             ("Diferencia vs. recomendada", 15, True), ("Observación", 14, False)]
+    for col, (text, width, right) in enumerate(heads, start=1):
+        header(ws, 4, col, text, width, right=right)
     ws.row_dimensions[4].height = 44
-    r = 5
+
+    first = r = 5
     for case in ("Uniforme", "Empírica"):
         for row in policies.get(case, []):
-            rec = (row["s"], row["Q"]) == tuple(recommended)
             vals = [(case, None), (row["s"], "0"), (row["Q"], "0"), (row["mean"], MONEY),
                     (row["std"], MONEY), (row["p_lost"], RATIO), (row["lost_day"], RATIO)]
             for col, (v, fmt) in enumerate(vals, start=1):
-                font = F_RESULT if (rec and col == 4) else (F_INPUT if rec and col in (2, 3)
-                                                            else F_BODY)
-                put(ws, (r, col), v, font, fmt, FILL_INPUT if rec else None, ROW_RULE)
-            put(ws, (r, 8), "Recomendada (cargada en Parametros)" if rec else None,
-                F_INPUT if rec else F_MUTED, fill=FILL_INPUT if rec else None,
-                border=ROW_RULE)
+                put(ws, (r, col), v, fmt=fmt, border=ROW_RULE)
             r += 1
-    last_row = r - 1
+    last = r - 1
+    if last < first:      # base workbook (before Step A9): nothing recorded yet
+        return
+    rng = lambda col: f"${col}${first}:${col}${last}"   # noqa: E731
+    for i in range(first, last + 1):
+        put(ws, (i, 8), f"=E{i}/SQRT(100)", fmt=MONEY, border=ROW_RULE)
+        put(ws, (i, 9), f'=IF(F{i}=0,"Sí","No")', border=ROW_RULE)
+        put(ws, (i, 10), f"=D{i}-SUMIFS({rng('D')},{rng('A')},A{i},{rng('B')},PuntoReorden,"
+                         f"{rng('C')},CantPedido)", fmt=MONEY, border=ROW_RULE)
+        put(ws, (i, 11), f'=IF(AND(B{i}=PuntoReorden,C{i}=CantPedido),"Recomendada","")',
+            F_INPUT, border=ROW_RULE)
+    # The highlight follows the policy loaded in Parametros
+    ws.conditional_formatting.add(
+        f"A{first}:K{last}",
+        FormulaRule(formula=[f"AND($B{first}=PuntoReorden,$C{first}=CantPedido)"],
+                    fill=FILL_INPUT, font=Font(name=FONT, color=HUE, bold=True)))
 
-    put(ws, (r + 1, 1), "Criterio de selección", F_SECTION)
+    # Selection criterion, one row per policy (policies listed by the uniform block)
+    unif = policies.get("Uniforme", [])
+    n = len(unif)
+    c0 = 13   # column M
+    crit = [("Política", 13, False), ("s", 5, True), ("Q", 5, True),
+            ("Ganancia uniforme", 15, True), ("Ganancia empírica", 15, True),
+            ("Promedio de ambos", 15, True), ("Servicio completo", 10, False),
+            ("Desv. estándar promedio", 14, True), ("Brecha vs. mejor con servicio", 15, True),
+            ("Empate estadístico (< 2 EE)", 12, False)]
+    put(ws, (3, c0), "Criterio de selección (calculado con fórmulas)", F_SECTION)
+    for k, (text, width, right) in enumerate(crit):
+        header(ws, 4, c0 + k, text, width, right=right)
+    M, N, O_, P, Q, R, S, T, U, V = "MNOPQRSTUV"   # criterion table columns
+    for i in range(n):
+        rr = first + i
+        put(ws, f"{N}{rr}", f"=B{rr}", fmt="0", border=ROW_RULE)
+        put(ws, f"{O_}{rr}", f"=C{rr}", fmt="0", border=ROW_RULE)
+        put(ws, f"{M}{rr}", f'="s="&{N}{rr}&", Q="&{O_}{rr}', border=ROW_RULE)
+        for col, case in ((P, "Uniforme"), (Q, "Empírica")):
+            put(ws, f"{col}{rr}", f'=SUMIFS({rng("D")},{rng("A")},"{case}",{rng("B")},{N}{rr},'
+                                 f'{rng("C")},{O_}{rr})', fmt=MONEY, border=ROW_RULE)
+        put(ws, f"{R}{rr}", f"=AVERAGE({P}{rr}:{Q}{rr})", F_RESULT, MONEY, border=ROW_RULE)
+        put(ws, f"{S}{rr}", f'=IF(COUNTIFS({rng("B")},{N}{rr},{rng("C")},{O_}{rr},'
+                            f'{rng("F")},">0")=0,"Sí","No")', border=ROW_RULE)
+        put(ws, f"{T}{rr}", f'=AVERAGEIFS({rng("E")},{rng("B")},{N}{rr},{rng("C")},{O_}{rr})',
+            fmt=MONEY, border=ROW_RULE)
+        crng = f"${R}${first}:${R}${first + n - 1}"
+        srng = f"${S}${first}:${S}${first + n - 1}"
+        put(ws, f"{U}{rr}", f'=IF({S}{rr}="Sí",_xlfn.MAXIFS({crng},{srng},"Sí")-{R}{rr},"–")',
+            fmt=MONEY, border=ROW_RULE)
+        put(ws, f"{V}{rr}", f'=IF({S}{rr}="Sí",IF({U}{rr}<2*$R${first + n + 4},"Sí","No"),"–")',
+            border=ROW_RULE)
+    ws.conditional_formatting.add(
+        f"{M}{first}:{V}{first + n - 1}",
+        FormulaRule(formula=[f"AND(${N}{first}=PuntoReorden,${O_}{first}=CantPedido)"],
+                    fill=FILL_INPUT, font=Font(name=FONT, color=HUE, bold=True)))
+
+    # Conclusions of the criterion, all formulas
+    base = first + n + 1
+    crng = f"${R}${first}:${R}${first + n - 1}"
+    srng = f"${S}${first}:${S}${first + n - 1}"
+    labels = f"${M}${first}:${M}${first + n - 1}"
+    rows = [
+        ("Mejor promedio con servicio completo",
+         f'=INDEX({labels},MATCH(_xlfn.MAXIFS({crng},{srng},"Sí"),{crng},0))', None),
+        ("Ganancia promedio de esa política", f'=_xlfn.MAXIFS({crng},{srng},"Sí")', MONEY),
+        ("Política cargada en Parametros", '="s="&PuntoReorden&", Q="&CantPedido', None),
+        ("Error estándar de una diferencia (√2 · EE)",
+         f"=SQRT(2)*AVERAGEIFS({rng('H')},{rng('B')},PuntoReorden,{rng('C')},CantPedido)",
+         MONEY),
+        ("¿La recomendada empata con la mejor?",
+         f'=INDEX(${V}${first}:${V}${first + n - 1},MATCH("s="&PuntoReorden&", Q="&CantPedido,'
+         f'{labels},0))', None),
+    ]
+    for k, (text, formula, fmt) in enumerate(rows):
+        put(ws, (base + k, c0), text, border=ROW_RULE)
+        put(ws, (base + k, c0 + 5), formula, F_RESULT, fmt, FILL_LEDGER, ROW_RULE,
+            align=Alignment(horizontal="right"))
+
+    put(ws, (last + 2, 1), "Criterio de selección", F_SECTION)
     notes = ["1. Servicio: cero ventas perdidas con ambas demandas (s ≥ 7 y Q ≥ 7 lo "
              "garantizan; ver informe, pregunta 5).",
              "2. Ganancia: entre esas políticas, la mayor ganancia promedio de los dos casos.",
-             "3. Riesgo: si las diferencias son menores que el error de Montecarlo, la de "
-             "menor desviación estándar."]
+             "3. Riesgo y precisión: si la brecha con la mejor es menor que dos errores "
+             "estándar, se trata como empate y se decide con la teoría (pregunta 6) y la "
+             "corrida de 1000 réplicas de la Parte B."]
     for i, text in enumerate(notes):
-        put(ws, (r + 2 + i, 1), text, F_MUTED)
+        put(ws, (last + 3 + i, 1), text, F_MUTED)
 
-    # Chart data block: one row per policy, both demand cases side by side
-    unif = policies.get("Uniforme", [])
-    emp = {(p["s"], p["Q"]): p for p in policies.get("Empírica", [])}
-    header(ws, 4, 10, "Política", 14)
-    header(ws, 4, 11, "Uniforme", 15, right=True)
-    header(ws, 4, 12, "Empírica", 15, right=True)
-    rec_idx = None
-    for i, p in enumerate(unif):
-        rr = 5 + i
-        put(ws, (rr, 10), f"s={p['s']}, Q={p['Q']}", border=ROW_RULE)
-        put(ws, (rr, 11), p["mean"], fmt=MONEY, border=ROW_RULE)
-        put(ws, (rr, 12), emp[(p["s"], p["Q"])]["mean"], fmt=MONEY, border=ROW_RULE)
-        if (p["s"], p["Q"]) == tuple(recommended):
-            rec_idx = i
     if unif:
-        n = len(unif)
+        rec_idx = next((i for i, p in enumerate(unif)
+                        if (p["s"], p["Q"]) == tuple(recommended)), None)
         chart = BarChart()
         chart.type = "bar"
         chart.grouping = "clustered"
         chart.gapWidth = 50
         chart.title = rich_title("Ganancia promedio por política (recomendada en azul)")
-        for col, color, light in ((11, INK, HUE), (12, GREY_SERIES, HUE_LIGHT)):
+        for col, color, light in ((16, INK, HUE), (17, GREY_SERIES, HUE_LIGHT)):
             chart.add_data(Reference(ws, min_col=col, min_row=4, max_row=4 + n),
                            titles_from_data=True)
             ser = chart.series[-1]
@@ -526,15 +593,15 @@ def build_politicas(wb, policies, recommended):
                 ser.dPt = [DataPoint(idx=rec_idx, invertIfNegative=False,
                                      spPr=GraphicalProperties(solidFill=light,
                                                               ln=LineProperties(noFill=True)))]
-        chart.set_categories(Reference(ws, min_col=10, min_row=5, max_row=4 + n))
+        chart.set_categories(Reference(ws, min_col=13, min_row=5, max_row=4 + n))
         style_axes(chart, "Política (s, Q)", "Ganancia anual promedio (COP)")
         chart.y_axis.numFmt = MILLIONS
-        means = [p["mean"] for p in unif] + [e["mean"] for e in emp.values()]
+        means = [p["mean"] for p in policies.get("Uniforme", []) + policies.get("Empírica", [])]
         chart.y_axis.scaling.min = (min(means) // 1_000_000 - 1) * 1_000_000
         chart.x_axis.scaling.orientation = "maxMin"   # first policy on top
         legend_bottom(chart)
-        chart.height, chart.width = 9.5, 17
-        ws.add_chart(chart, f"J{max(last_row, 4 + n) + 3}")
+        chart.height, chart.width = 9.5, 18
+        ws.add_chart(chart, f"M{base + len(rows) + 2}")
 
 
 def main():

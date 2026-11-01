@@ -16,7 +16,9 @@ if [[ "${1:-}" == "--recalcular" || ! -f resultados/valores_excel.json ]]; then
   /usr/bin/python3 tools/calcular_libreoffice.py build/base.xlsx resultados/valores_excel.json
 fi
 uv run python tools/construir_excel.py "${PREFIJO}.xlsx" resultados/valores_excel.json
-uv run python tools/inyectar_valores.py "${PREFIJO}.xlsx" resultados/valores_excel.json
+/usr/bin/python3 tools/calcular_politicas.py "${PREFIJO}.xlsx" build/politicas_cache.json
+uv run python tools/inyectar_valores.py "${PREFIJO}.xlsx" resultados/valores_excel.json \
+  build/politicas_cache.json
 
 # Numbers and tables for the LaTeX report (Overleaf)
 uv run python tools/exportar_resultados.py resultados/valores_excel.json informe/resultados.tex

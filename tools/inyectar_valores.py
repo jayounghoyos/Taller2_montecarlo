@@ -5,7 +5,7 @@ by the spreadsheet engine (tools/calcular_libreoffice.py) so the workbook opens
 showing the saved replication in any viewer, while every formula and the data
 table remain live.
 
-Usage: python tools/inyectar_valores.py LIBRO.xlsx valores.json
+Usage: python tools/inyectar_valores.py LIBRO.xlsx valores.json [mas_valores.json ...]
 """
 
 import json
@@ -20,7 +20,8 @@ from openpyxl.utils import get_column_letter
 
 SHEET_FILES = {"Parametros": "xl/worksheets/sheet1.xml",
                "Uniforme": "xl/worksheets/sheet2.xml",
-               "Empirica": "xl/worksheets/sheet3.xml"}
+               "Empirica": "xl/worksheets/sheet3.xml",
+               "Politicas": "xl/worksheets/sheet4.xml"}
 
 CELL_RE = re.compile(r'<c r="([A-Z]+\d+)"([^>]*?)>(<f[^>]*?(?:/>|>.*?</f>))<v\s*/>(</c>)', re.S)
 
@@ -46,6 +47,8 @@ def inject(xml, values):
 def main():
     path, json_path = sys.argv[1], sys.argv[2]
     data = json.load(open(json_path, encoding="utf-8"))
+    for extra in sys.argv[3:]:     # e.g. the Politicas cache
+        data["cached"].update(json.load(open(extra, encoding="utf-8"))["cached"])
     by_sheet = {}
     for sheet, cells in data["cached"].items():
         by_sheet[sheet] = {}
@@ -61,7 +64,7 @@ def main():
         for item in zin.infolist():
             content = zin.read(item.filename)
             for sheet, fname in SHEET_FILES.items():
-                if item.filename == fname:
+                if item.filename == fname and sheet in by_sheet:
                     xml, missing = inject(content.decode("utf-8"), by_sheet[sheet])
                     if missing:
                         raise SystemExit(f"{sheet}: no value for {missing[:10]}")

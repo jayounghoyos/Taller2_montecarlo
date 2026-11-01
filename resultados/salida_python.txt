@@ -126,4 +126,4 @@ Q=19: media    102,977,296 COP | frente a Q=15:   -356,890 ±  257,211 COP
 (s=6, Q=15) - (s=7, Q=15) =    421,108 ± 219,755 COP | P(pérdida) = 0.0066
 (s=5, Q=15) - (s=7, Q=15) =    315,747 ± 220,878 COP | P(pérdida) = 0.0304
 
-Tiempo total de cómputo: 11.0 s
+Tiempo total de cómputo: 10.8 s
